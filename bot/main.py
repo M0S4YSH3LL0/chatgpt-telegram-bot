@@ -61,6 +61,7 @@ def main():
         'token_price': float(os.environ.get('TOKEN_PRICE', 0.002)),
         'image_prices': [float(i) for i in os.environ.get('IMAGE_PRICES',"0.016,0.018,0.02").split(",")],
         'transcription_price': float(os.environ.get('TOKEN_PRICE', 0.002)),
+        'prompt_api_endpoint': os.environ.get('PROMPT_API_ENDPOINT', 'https://www.jailbreakchat.com/api/getprompts')
     }
     # Setup and run ChatGPT and Telegram bot
     openai_helper = OpenAIHelper(config=openai_config)

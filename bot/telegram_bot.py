@@ -2,20 +2,22 @@ import logging
 import os
 
 from telegram import constants
-from telegram import Update, InlineQueryResultArticle, InputTextMessageContent, BotCommand
+from telegram import Update, InlineQueryResultArticle, InputTextMessageContent, BotCommand,\
+    InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import ApplicationBuilder, ContextTypes, CommandHandler, MessageHandler, \
-    filters, InlineQueryHandler, Application
+    filters, InlineQueryHandler, Application, CallbackQueryHandler
 
 from pydub import AudioSegment
 from openai_helper import OpenAIHelper
 from usage_tracker import UsageTracker
+
+import requests
 
 
 class ChatGPT3TelegramBot:
     """
     Class representing a Chat-GPT3 Telegram Bot.
     """
-
     def __init__(self, config: dict, openai: OpenAIHelper):
         """
         Initializes the bot with the given configuration and GPT-3 bot object.
@@ -26,29 +28,81 @@ class ChatGPT3TelegramBot:
         self.openai = openai
         self.commands = [
             BotCommand(command='help', description='Show help message'),
-            BotCommand(command='reset', description='Reset the conversation. Optionally pass high-level instructions for the conversation (e.g. /reset You are a helpful assistant)'),
-            BotCommand(command='image', description='Generate image from prompt (e.g. /image cat)'),
-            BotCommand(command='stats', description='Get your current usage statistics')
+            BotCommand(command='jailbreakz', description='Top 10 jailbreak prompts'),
+            BotCommand(command='reset', description='Reset to normie mode'),
+            BotCommand(command='image', description='Generate image from prompt'),
+            BotCommand(command='stats', description='Get current usage statistics')
         ]
         self.disallowed_message = "Sorry, you are not allowed to use this bot. You can check out the source code at " \
                                   "https://github.com/n3d1117/chatgpt-telegram-bot"
         self.budget_limit_message = "Sorry, you have reached your monthly usage limit."
         self.usage = {}
 
+        response = requests.get(self.config['prompt_api_endpoint']).json()
+        items = []
+        for item in response:
+            item_arr = []
+            for key, value in item.items():
+                item_arr.append(value)
+            items.append(item_arr)
+
+        items.sort(key=lambda x: x[9], reverse=True)
+        self.jb_prompts = items[:9]
+
+    async def show_jailbreak_list(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        keyboard = []
+        for x in range(0, len(self.jb_prompts)):
+            keyboard.append(
+                [InlineKeyboardButton(
+                    f'{self.jb_prompts[x][2]} ({self.jb_prompts[x][9]})',
+                    callback_data=f'{x}'
+                )]
+            )
+
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        help_text = 'Choose a jailbreak prompt'
+
+        await update.message.reply_text(help_text, disable_web_page_preview=True, reply_markup=reply_markup)
+
+    async def set_jailbreak_from_list(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
+        query = update.callback_query
+        prompt_idx = int(query.data)
+        prompt_text = self.jb_prompts[prompt_idx][3]
+
+        chat_id = update.effective_chat.id
+        message_id = query.message.message_id
+
+        await context.bot.send_chat_action(chat_id=chat_id, action=constants.ChatAction.TYPING)
+
+        self.openai.reset_chat_history(chat_id, prompt_text)
+        response = await self.openai.get_chat_response(chat_id=chat_id, query="To confirm, respond with an answer to "
+                                                                              "the question: Who are you?")
+        response, total_tokens = response
+
+        await context.bot.delete_message(chat_id=chat_id, message_id=message_id)
+
+        await context.bot.send_message(
+            chat_id=chat_id,
+            reply_to_message_id=None,
+            text=response,
+            parse_mode=constants.ParseMode.MARKDOWN
+        )
+        await query.message.reply_text('🔓 Unleashed the beast!')
+
     async def help(self, update: Update, context: ContextTypes.DEFAULT_TYPE) -> None:
         """
         Shows the help menu.
         """
         commands = [f'/{command.command} - {command.description}' for command in self.commands]
-        help_text = 'I\'m a ChatGPT bot, talk to me!' + \
+        help_text = 'I\'m Jailbreak0rGPT ⛓️' + \
                     '\n\n' + \
                     '\n'.join(commands) + \
                     '\n\n' + \
-                    'Send me a voice message or file and I\'ll transcribe it for you!' + \
-                    '\n\n' + \
-                    "Open source at https://github.com/n3d1117/chatgpt-telegram-bot"
-        await update.message.reply_text(help_text, disable_web_page_preview=True)
+                    "Original: Open source at https://github.com/n3d1117/chatgpt-telegram-bot" \
+                    '\n' + \
+                    "Modded: Open source at https://github.com/m0s4ysh3ll0/Jailbreak0rGPT"
 
+        await update.message.reply_text(help_text, disable_web_page_preview=True)
 
     async def stats(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -104,7 +158,7 @@ class ChatGPT3TelegramBot:
         chat_id = update.effective_chat.id
         reset_content = update.message.text.replace('/reset', '').strip()
         self.openai.reset_chat_history(chat_id=chat_id, content=reset_content)
-        await context.bot.send_message(chat_id=chat_id, text='Done!')
+        await context.bot.send_message(chat_id=chat_id, text='🔒 We are back to normie mode!')
 
     async def image(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
         """
@@ -496,14 +550,16 @@ class ChatGPT3TelegramBot:
         application.add_handler(CommandHandler('image', self.image))
         application.add_handler(CommandHandler('start', self.help))
         application.add_handler(CommandHandler('stats', self.stats))
+        application.add_handler(CommandHandler('jailbreakz', self.show_jailbreak_list))
         application.add_handler(MessageHandler(
             filters.AUDIO | filters.VOICE | filters.Document.AUDIO |
             filters.VIDEO | filters.VIDEO_NOTE | filters.Document.VIDEO,
             self.transcribe))
         application.add_handler(MessageHandler(filters.TEXT & (~filters.COMMAND), self.prompt))
         application.add_handler(InlineQueryHandler(self.inline_query, chat_types=[
-            constants.ChatType.GROUP, constants.ChatType.SUPERGROUP
+            constants.ChatType.GROUP, constants.ChatType.SUPERGROUP, constants.ChatType.PRIVATE
         ]))
+        application.add_handler(CallbackQueryHandler(self.set_jailbreak_from_list))
 
         application.add_error_handler(self.error_handler)
 
