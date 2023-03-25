@@ -36,16 +36,8 @@ def main():
         'n_choices': int(os.environ.get('N_CHOICES', 1)),
         'temperature': float(os.environ.get('TEMPERATURE', 1.0)),
         'image_size': os.environ.get('IMAGE_SIZE', '512x512'),
-
-        # 'gpt-3.5-turbo' or 'gpt-3.5-turbo-0301'
         'model': os.environ.get('OPENAI_MODEL', 'gpt-3.5-turbo'),
-
-        # Number between -2.0 and 2.0. Positive values penalize new tokens based on whether
-        # they appear in the text so far, increasing the model's likelihood to talk about new topics.
         'presence_penalty': int(os.environ.get('PRESENCE_PENALTY', 0)),
-
-        # Number between -2.0 and 2.0. Positive values penalize new tokens based on their existing
-        # frequency in the text so far, decreasing the model's likelihood to repeat the same line verbatim.
         'frequency_penalty': int(os.environ.get('FREQUENCY_PENALTY', 0)),
     }
 
@@ -63,6 +55,7 @@ def main():
         'transcription_price': float(os.environ.get('TOKEN_PRICE', 0.002)),
         'prompt_api_endpoint': os.environ.get('PROMPT_API_ENDPOINT', 'https://www.jailbreakchat.com/api/getprompts')
     }
+
     # Setup and run ChatGPT and Telegram bot
     openai_helper = OpenAIHelper(config=openai_config)
     telegram_bot = ChatGPT3TelegramBot(config=telegram_config, openai=openai_helper)
