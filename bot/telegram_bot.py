@@ -97,11 +97,7 @@ class ChatGPT3TelegramBot:
         commands = [f'/{command.command} - {command.description}' for command in self.commands]
         help_text = 'I\'m Jailbreak0rGPT ⛓️' + \
                     '\n\n' + \
-                    '\n'.join(commands) + \
-                    '\n\n' + \
-                    "Original: Open source at https://github.com/n3d1117/chatgpt-telegram-bot" \
-                    '\n' + \
-                    "Modded: Open source at https://github.com/m0s4ysh3ll0/Jailbreak0rGPT"
+                    '\n'.join(commands)
 
         await update.message.reply_text(help_text, disable_web_page_preview=True)
 
